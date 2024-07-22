@@ -14,11 +14,13 @@ class Snake:
         self.screen, self.length = screen, gridSize
         self.speed = gridSize # Change this value to 1 for better transition of the snake on the grid
         self.numberOfBlockes = (700 - self.length * 4) // self.length
-        self.xChange, self.yChange, self.direction = 1, 0, "Right"
-        self.snakeBodyPart = [[self.snakeSpawn(), self.snakeSpawn(), self.xChange, self.yChange, self.direction]]
+        self.xChange, self.yChange = 1, 0
+        self.direction = "Right"
+        self.snakeBodyPart = np.array([[self.snakeSpawn(), self.snakeSpawn(), self.xChange, self.yChange]], dtype="i")
+        self.snakeBodyDirection = np.array(["Right"], dtype="S")
         self.gameOver = False
         self.font = pygame.font.Font('freesansbold.ttf', 20)
-        self.path = os.path.abspath(__file__)[:-12]
+        self.path = os.path.abspath(__file__)[:-6]
         self.foodApple = pygame.image.load(self.path + "apple.png")
         self.xpos, self.ypos = 0, 0
         self.foodPosition()
@@ -34,7 +36,6 @@ class Snake:
     
     def drawSnake(self):
         for i, body in enumerate(self.snakeBodyPart):
-            #print(i, self.snakeBodyPart)
             if i == 0:
                 color = (78,124,246)
                 if body[2] == 1:
@@ -61,9 +62,9 @@ class Snake:
 
     def backgroundDraw(self):
         self.screen.fill((87,138,52))
-        rect = [self.length * 2, self.length * 2, self.length * self.numberOfBlockes, self.length * self.numberOfBlockes]
+        rect = np.array([self.length * 2, self.length * 2, self.length * self.numberOfBlockes, self.length * self.numberOfBlockes])
         pygame.draw.rect(self.screen, ((170,215,81)), rect)
-        dimension = [self.length * 2, self.length * 2, self.length, self.length]
+        dimension = np.array([self.length * 2, self.length * 2, self.length, self.length])
         color, i = (162,209,73), 2
         score = self.font.render(f'SCORE: {len(self.snakeBodyPart) - 1}', True, (255, 255, 255))
         while i < (self.numberOfBlockes + 2):
@@ -79,32 +80,23 @@ class Snake:
                     pygame.draw.rect(self.screen, color, dimension)
                 j += 1
             i += 1
-        # Drawing food and points on the background.
-        self.screen.blit(self.foodApple, (self.food[0][0], self.food[0][1]))
+        # Drawing food and score on the background.
+        self.screen.blit(self.foodApple, (self.food[0, 0], self.food[0, 1]))
         self.screen.blit(score, (550, 50))
 
     def update(self):
         # CHECKING WHETHER THE SNAKE IS INSIDE OR OUTSIDE OF THE PLAYING AREA
-        if self.snakeBodyPart[0][0] > self.length * (self.numberOfBlockes + 1) or self.snakeBodyPart[0][0] < self.length * 2 or self.snakeBodyPart[0][1] > self.length * (self.numberOfBlockes + 1) or self.snakeBodyPart[0][1] < self.length * 2:
+        if self.snakeBodyPart[0, 0] > self.length * (self.numberOfBlockes + 1) or self.snakeBodyPart[0, 0] < self.length * 2 or self.snakeBodyPart[0, 1] > self.length * (self.numberOfBlockes + 1) or self.snakeBodyPart[0, 1] < self.length * 2:
             self.gameOver = True
         if not self.gameOver:
-            i = len(self.snakeBodyPart) - 1
-            while i >= 0:
-                nextBodyPart = list(self.snakeBodyPart.pop(i))
-                if i == 0:
-                    # ASSIGNING xChange, yChange AND direction PARAMETERS TO THE HEAD OF THE SNAKE
-                    nextBodyPart[2], nextBodyPart[3], nextBodyPart[4] = self.xChange, self.yChange, self.direction
-                else:
-                    # ASSIGNING PREVIOUS BODY PART ATTRIBUTES TO THE NEXT 
-                    nextBodyPart[2], nextBodyPart[3], nextBodyPart[4] = self.snakeBodyPart[i - 1][2], self.snakeBodyPart[i - 1][3], self.snakeBodyPart[i - 1][4]
-                # MOVING BODY IN RESPECTIVE DIRECTION
-                nextBodyPart[0] += nextBodyPart[2] * self.speed
-                nextBodyPart[1] += nextBodyPart[3] * self.speed
-                self.snakeBodyPart.insert(i, tuple(nextBodyPart))
-                i -= 1
+            self.snakeBodyDirection = np.insert(self.snakeBodyDirection, 0, self.direction)
+            self.snakeBodyDirection = np.delete(self.snakeBodyDirection, -1)
+            new_head = [self.snakeBodyPart[0, 0] + self.xChange * self.speed, self.snakeBodyPart[0, 1] + self.yChange * self.speed, self.xChange, self.yChange]
+            self.snakeBodyPart = np.insert(self.snakeBodyPart, 0, [new_head], axis = 0)
+            self.snakeBodyPart = np.delete(self.snakeBodyPart, -1, axis = 0)
 
     def controls(self):
-        if self.snakeBodyPart[0][0] % self.length == 0 and self.snakeBodyPart[0][1] % self.length == 0:
+        if self.snakeBodyPart[0, 0] % self.length == 0 and self.snakeBodyPart[0, 1] % self.length == 0:
             if self.yChange != 1 and self.direction == "Up":
                 self.xChange, self.yChange = 0, -1
             if self.yChange != -1 and self.direction == "Down":
@@ -121,9 +113,9 @@ class Snake:
             self.gameOver = False
     
     def foodPosition(self):
-        newPosition = [(self.randomSpawn(), self.randomSpawn())]
+        newPosition = np.array([(self.randomSpawn(), self.randomSpawn())], dtype='i')
         while any((newPosition[0][0] == body[0] and newPosition[0][1] == body[1]) for body in self.snakeBodyPart):
-           newPosition = [(self.randomSpawn(), self.randomSpawn())]
+           newPosition = np.array([(self.randomSpawn(), self.randomSpawn())], dtype='i')
         self.food = newPosition
     
     def checkGameStatus(self): # Checks wheather player is playing or he has completed the game
@@ -133,26 +125,23 @@ class Snake:
             #self.reward += 10
 
     def checkCollision(self):
-        if self.snakeBodyPart[0][0] == self.food[0][0] and self.snakeBodyPart[0][1] == self.food[0][1]:
+        if self.snakeBodyPart[0, 0] == self.food[0, 0] and self.snakeBodyPart[0, 1] == self.food[0, 1]:
             self.reward += 10
             self.checkGameStatus()
             if not self.gameOver:
                 self.foodPosition()
-            #print(self.snakeBodyPart)
-            if self.snakeBodyPart[-1][2] == -1 or self.snakeBodyPart[-1][2] == 1:
-                new = [self.snakeBodyPart[-1][0] - (self.length * self.snakeBodyPart[-1][2]), self.snakeBodyPart[-1][1], self.snakeBodyPart[-1][2], 0, self.snakeBodyPart[-1][4]]
-            elif self.snakeBodyPart[-1][3] == -1 or self.snakeBodyPart[-1][3] == 1:
-                new = [self.snakeBodyPart[-1][0], self.snakeBodyPart[-1][1] - (self.length * self.snakeBodyPart[-1][3]), 0, self.snakeBodyPart[-1][3], self.snakeBodyPart[-1][4]]
-            self.snakeBodyPart.append(tuple(new))
-        if len(self.snakeBodyPart) > 0 and self.gameOver != True:
-            collisionWithBody = any((body[0] == self.snakeBodyPart[0][0] and body[1] == self.snakeBodyPart[0][1]) for body in self.snakeBodyPart[1::])
-            if collisionWithBody:
-                self.gameOver = True
-                self.reward -= 10
+            if self.snakeBodyPart[-1, 2] == -1 or self.snakeBodyPart[-1, 2] == 1:
+                new = [self.snakeBodyPart[-1, 0] - (self.length * self.snakeBodyPart[-1, 2]), self.snakeBodyPart[-1, 1], self.snakeBodyPart[-1, 2], 0]
+            elif self.snakeBodyPart[-1, 3] == -1 or self.snakeBodyPart[-1, 3] == 1:
+                new = [self.snakeBodyPart[-1, 0], self.snakeBodyPart[-1, 1] - (self.length * self.snakeBodyPart[-1, 3]), 0, self.snakeBodyPart[-1, 3]]
+            self.snakeBodyDirection = np.append(self.snakeBodyDirection, self.snakeBodyDirection[-1])
+            self.snakeBodyPart = np.append(self.snakeBodyPart, [new], axis=0)
+        if len(self.snakeBodyPart) > 0 and any((body[0] == self.snakeBodyPart[0, 0] and body[1] == self.snakeBodyPart[0, 1]) for body in self.snakeBodyPart[1::]):
+            self.gameOver = True
+            self.reward -= 10
         if self.frame_iteration >= 10000 * len(self.snakeBodyPart):
             self.gameOver = True
             self.reward -= 10
-
 
     #taging them on the basis of the turn like left turn or right turn or going down
     #iterating in self.snakeBodyPart when len of that list is greater than the 2
@@ -164,121 +153,84 @@ class Snake:
     def step(self, action): # action a list [forward, left turn, right turn] respective values can only be 1 or 0
         self.reward = 0
         self.backgroundDraw()
-        if self.snakeBodyPart[0][0] % self.length == 0 and self.snakeBodyPart[0][1] % self.length == 0:
+        if self.snakeBodyPart[0, 0] % self.length == 0 and self.snakeBodyPart[0, 1] % self.length == 0:
             '''number = input("Enter something: ")
             action = [int(number[0]), int(number[1]), int(number[2])]'''
             action = self.decisionMaking()
             direction = ["Right", "Down", "Left", "Up"]
             if np.array_equal(action, [0, 1, 0]): # NUMPY ARRAYS ARE 50x FASTER THAN PYTHON LISTS
-                if self.direction == "Right":
-                    self.direction = "Up"
-                else:
-                    self.direction = direction[direction.index(self.direction) - 1]
+                self.direction = direction[(direction.index(self.direction) - 1) % 4]
             elif np.array_equal(action, [0, 0, 1]):
-                if self.direction == "Up":
-                    self.direction = "Right"
-                else:
-                    self.direction = direction[direction.index(self.direction) + 1]
+                self.direction = direction[(direction.index(self.direction) + 1) % 4]
         self.controls()
         self.update()
         self.drawSnake()
         self.checkCollision()
         return self.reward, self.gameOver, len(self.snakeBodyPart) - 1
-    
+
     def decisionMaking(self):
-        
         #CHECKING FOR THE INITIAL DISTANCE BETWEEN HEAD AND FOOD
-        xabs = abs(self.food[0][0] - self.snakeBodyPart[0][0])
-        yabs = abs(self.food[0][1] - self.snakeBodyPart[0][1])
+
+        directioncheck = np.array(["Right", "Down", "Left", "Up"], dtype="S")
+
+        xabs = abs(self.food[0, 0] - self.snakeBodyPart[0, 0])
+        yabs = abs(self.food[0, 1] - self.snakeBodyPart[0, 1])
 
         # CHECKING FOR THE LEFT OR RIGHT TURN
-        if self.snakeBodyPart[0][2] == 0: # MOVING IN Y AXIS
+        if self.snakeBodyPart[0, 2] == 0: # MOVING IN Y AXIS
 
             # RIGHT SIDE MEANS POSITIVE X DIRECTION 
-            xright = abs(self.food[0][0] - self.snakeBodyPart[0][0] + 1 * self.speed)
-            yright = abs(self.food[0][1] - self.snakeBodyPart[0][1] + 0 * self.speed)
+            xright = abs(self.food[0, 0] - self.snakeBodyPart[0, 0] + 1 * self.speed)
+            yright = abs(self.food[0, 1] - self.snakeBodyPart[0, 1] + 0 * self.speed)
             if xright < xabs or yright < yabs:
-                if self.snakeBodyPart[0][4] == 'Up':
-
-                    return [0, 1, 0] # LEFT TURN 
+                if np.array_equal(self.snakeBodyDirection[0], directioncheck[3]):
+                    return np.array([0, 1, 0], dtype='i') # LEFT TURN 
                 else:
-                    return [0, 0, 1] # RIGHT TURN 
-                
+                    return np.array([0, 0, 1], dtype='i') # RIGHT TURN 
+
             # LEFT SIDE MEANS NEGATIVE X DIRECTION
-            xleft = abs(self.food[0][0] - self.snakeBodyPart[0][0] + ((-1) * self.speed))
-            yleft = abs(self.food[0][1] - self.snakeBodyPart[0][1] + 0 * self.speed)
+            xleft = abs(self.food[0, 0] - self.snakeBodyPart[0, 0] + ((-1) * self.speed))
+            yleft = abs(self.food[0, 1] - self.snakeBodyPart[0, 1] + 0 * self.speed)
             if xleft < xabs or yleft < yabs:
-                if self.snakeBodyPart[0][4] == 'Up':
-                    return [0, 0, 1] # RIGHT TURN
+                if np.array_equal(self.snakeBodyDirection[0], directioncheck[3]):
+                    return np.array([0, 0, 1], dtype='i') # RIGHT TURN
                 else:
-                    return [0, 1, 0] # LEFT TURN
-
+                    return np.array([0, 1, 0], dtype='i') # LEFT TURN
+                
         # CHECKING FOR THE UP OR DOWN
-        if self.snakeBodyPart[0][3] == 0: # MOVING IN X AXIX
+        if self.snakeBodyPart[0, 3] == 0: # MOVING IN X AXIX
             
             # UP SIDE MEANS NEGATIVE Y DIRECTION
-            xup = abs(self.food[0][0] - self.snakeBodyPart[0][0] + 0 * self.speed)
-            yup = abs(self.food[0][1] - self.snakeBodyPart[0][1] + ((-1) * self.speed))
+            xup = abs(self.food[0, 0] - self.snakeBodyPart[0, 0] + 0 * self.speed)
+            yup = abs(self.food[0, 1] - self.snakeBodyPart[0, 1] + ((-1) * self.speed))
             if xup < xabs or yup < yabs:
-                if self.snakeBodyPart[0][4] == 'Right':
-                    return [0, 0, 1] # RIGHT TURN 
+                if np.array_equal(self.snakeBodyDirection[0], directioncheck[0]):
+                    return np.array([0, 0, 1], dtype='i') # RIGHT TURN 
                 else:
-                    return [0, 1, 0] # LEFT TURN 
-                
+                    return np.array([0, 1, 0], dtype='i') # LEFT TURN 
+  
             # DOWN SIDE MEANS POSITIVE Y DIRECTION
-            xdown = abs(self.food[0][0] - self.snakeBodyPart[0][0] + 0 * self.speed)
-            ydown = abs(self.food[0][1] - self.snakeBodyPart[0][1] + 1 * self.speed)
+            xdown = abs(self.food[0, 0] - self.snakeBodyPart[0, 0] + 0 * self.speed)
+            ydown = abs(self.food[0, 1] - self.snakeBodyPart[0, 1] + 1 * self.speed)
             if xdown < xabs or ydown < yabs:
-                if self.snakeBodyPart[0][4] == 'Right':
-                    return [0, 1, 0] # LEFT TURN 
+                if np.array_equal(self.snakeBodyDirection[0], directioncheck[0]):
+                    return np.array([0, 1, 0], dtype='i') # LEFT TURN 
                 else:
-                    return [0, 0, 1] # RIGHT TURN
-                
+                    return np.array([0, 0, 1], dtype='i') # RIGHT TURN
+
         # FORWARD POINT CHECK
-        xforward = abs(self.food[0][0] - self.snakeBodyPart[0][0] + self.snakeBodyPart[0][2] * self.speed)
-        yforward = abs(self.food[0][1] - self.snakeBodyPart[0][1] + self.snakeBodyPart[0][3] * self.speed)
+        xforward = abs(self.food[0, 0] - self.snakeBodyPart[0, 0] + self.snakeBodyPart[0, 2] * self.speed)
+        yforward = abs(self.food[0, 1] - self.snakeBodyPart[0, 1] + self.snakeBodyPart[0, 3] * self.speed)
         if xforward < xabs or yforward < yabs:
-            return [1, 0, 0] # CONTINUING IN SAME DIRECTION
-
-        '''turn = [0, 0, 0]
-
-        xforward = abs(self.food[0][0] - self.snakeBodyPart[0][0] + self.snakeBodyPart[0][2] * self.speed)
-        yforward = abs(self.food[0][1] - self.snakeBodyPart[0][1] + self.snakeBodyPart[0][3] * self.speed)
-
-        if self.snakeBodyPart[0][4] == 'Up' or self.snakeBodyPart[0][4] == 'Down':
-            xright = abs(self.food[0][0] - self.snakeBodyPart[0][0] + 1 * self.speed)
-            xleft = abs(self.food[0][0] - self.snakeBodyPart[0][0] + ((-1) * self.speed))
-            turn[0] -= abs(yabs - yforward) / 10
-            if self.snakeBodyPart[0][4] == 'Up':
-                turn[1] -= abs(xabs - xleft) / 10
-                turn[2] -= abs(xabs - xright) / 10
-            if self.snakeBodyPart[0][4] == 'Down':
-                turn[1] -= abs(xabs - xright) / 10 
-                turn[2] -= abs(xabs - xleft) / 10
-
-        if self.snakeBodyPart[0][4] == 'Right' or self.snakeBodyPart[0][4] == 'Left':
-            ydown = abs(self.food[0][1] - self.snakeBodyPart[0][1] + 1 * self.speed)
-            yup = abs(self.food[0][1] - self.snakeBodyPart[0][1] + ((-1) * self.speed))
-            turn[0] -= abs(xabs - xforward) / 10
-            if self.snakeBodyPart[0][4] == 'Right':
-                turn[1] -= abs(yabs - ydown) / 10
-                turn[2] -= abs(yabs - yup) / 10
-            if self.snakeBodyPart[0][4] == 'Left':
-                turn[1] -= abs(yabs - yup) / 10
-                turn[2] -= abs(yabs - ydown) / 10
-
-        print(turn)
-        time.sleep(1)
-        return [0, 0, 1]'''
+            return np.array([1, 0, 0], dtype='i') # CONTINUING IN SAME DIRECTION
 
 if __name__ == '__main__':
-    initial = time.time()
     pygame.init()
     screen = pygame.display.set_mode((700, 700))
     pygame.display.set_caption("Snake Game")
-    gridSize = 40 # Change this value for different resolution of grid and snake
+    gridSize = 5 # Change this value for different resolution of grid and snake
     snake = Snake(screen, gridSize)
-    moves = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    moves = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     clock = pygame.time.Clock()
     run = True
     while run:
@@ -293,8 +245,7 @@ if __name__ == '__main__':
             snake.reset()
         pygame.display.update()
         print(clock.get_fps())
-        clock.tick(15)
-
+        clock.tick(60)
 
 # Need to create a function which will take list as an arg [Forward, Left, Right] 
 # while true:
@@ -302,4 +253,3 @@ if __name__ == '__main__':
 #   
 # Once we get the isOver = True then use reset() function to reset game 
 # and run while loop again 
-#
